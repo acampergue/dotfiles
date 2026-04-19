@@ -1,7 +1,9 @@
 {{- $email := promptStringOnce . "email" "Email address" -}}
+{{- $name := promptStringOnce . "name" "Full Name" -}}
 [git]
     autoCommit = true
     autoPush = true
 [data]
+    name = {{ $name | quote }}
     email = {{ $email | quote }}
 
