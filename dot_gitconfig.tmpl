@@ -2,30 +2,38 @@
   name = {{ .name }}
   email = {{ .email }}
 [core]
-	editor = nvim
-	pager = /usr/bin/less -R -F -X
+  editor = nvim
+  pager = /usr/bin/less -R -F -X
+  {{- if eq .env "gip" }}
+  autocrlf = input
+  {{- end }}
 [merge]
-	tool = meld
+  tool = meld
 [color]
-	status = auto
-	branch = auto
-	interactive = auto
-	diff = auto
+  status = auto
+  branch = auto
+  interactive = auto
+  diff = auto
 [alias]
-	co = checkout
-	br = branch
-	st = status
-	ci = commit
-	unstage = reset HEAD --
-	ls = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate
-	ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
+  co = checkout
+  br = branch
+  st = status
+  ci = commit
+  unstage = reset HEAD --
+  ls = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate
+  ll = log --pretty=format:"%C(yellow)%h%Cred%d\\ %Creset%s%Cblue\\ [%cn]" --decorate --numstat
 [push]
-	autoSetupRemote = true
+  autoSetupRemote = true
 [init]
-	defaultBranch = main
+  defaultBranch = main
 [pull]
-	rebase = true
+  rebase = true
 [pager]
-	branch = true
+  branch = true
 [credential]
-	helper = cache --timeout=36000
+  helper = cache --timeout=36000
+[filter "lfs"]
+  clean = git-lfs clean -- %f
+  smudge = git-lfs smudge -- %f
+  process = git-lfs filter-process
+  required = true
