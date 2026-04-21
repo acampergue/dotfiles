@@ -1,0 +1,49 @@
+# sudo pacman -S beets ffmpeg aubio python-librosa chromaprint
+#   python-discogs-client python-pyacoustid
+#   python-standard-aifc python-standard-sunau
+
+directory: ~/Music/Swing
+library: ~/Music/Swing/swinglibrary.db
+
+import:
+  move: no
+  copy: yes
+  write: yes
+
+replace:
+  '[\\/]': _
+  '^\.': _
+  '[\x00-\x1f]': _
+  '[<>:"\?\*\|]': _
+  '\.$': _
+  '\s+$': ''
+  '^\s+': ''
+  '^-': _
+
+# autobpm and python 3.13 : https://github.com/beetbox/beets/issues/5575
+plugins: acousticbrainz duplicates fromfilename autobpm info discogs
+
+
+# === Output formatting ===
+ui:
+  color: yes
+
+autobpm:
+  auto: no
+  overwrite: no
+
+# === Catégorisation par plages BPM pour DJ Balboa ===
+# item_fields:
+  # tempo_folder: >
+    # u'100–139 Slow & Blues' if bpm and bpm < 140 else
+    # u'140–159 Balboa Warmup' if bpm and bpm < 160 else
+    # u'160–199 Balboa Medium' if bpm and bpm < 200 else
+    # u'200–249 Balboa Fast' if bpm and bpm < 250 else
+    # u'250+ Balboa Very Fast'
+
+# === Path format ===
+# paths:
+  # default: $tempo_folder/$bpm"bpm - "$artist" - "$title
+  # singleton: Singles/$tempo_folder/$bpm"bpm - "$artist" - "$title
+  # comp: Compilations/$album/$tempo_folder/$bpm"bpm - "$artist" - "$title
+
