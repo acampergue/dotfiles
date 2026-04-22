@@ -1,6 +1,10 @@
 {{- $email := promptStringOnce . "email" "Email address" -}}
 {{- $name := promptStringOnce . "name" "Full Name" -}}
 {{- $env := promptStringOnce . "env" "Environment (home, gip, etc)" -}}
+encryption = "age"
+[age]
+  identity = "/home/acampergue/.age/key.txt"
+  recipient = "age1uphk2neacglrtfq7hgyvg2lpjcrtg5sywed642kgtlefrzxnu3jqsc7hj2"
 [git]
     autoCommit = true
     autoPush = true
