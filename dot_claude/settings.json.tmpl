@@ -2,16 +2,19 @@
   "permissions": {
     "allow": [
       "Bash(glab:*)",
-      "Bash(git:*)",
       "Read(~/.claude/plugins/**)",
+      {{- if eq .env "gip" }}
       "Skill(gip-conventional-commit:*)",
       "Skill(gitlab-workflow:*)",
       "Skill(superpowers:*)",
-      "Skill(upgrade-gitlab:*)"
+      "Skill(upgrade-gitlab:*)",
+      {{- end }}
+      "Bash(git:*)"
     ],
     "defaultMode": "default"
   },
   "model": "opus[1m]",
+  {{- if eq .env "gip" }}
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
     "upgrade-gitlab@janus-claude-marketplace": true,
@@ -26,6 +29,7 @@
       }
     }
   },
+  {{- end }}
   "voice": {
     "enabled": true,
     "mode": "hold"
