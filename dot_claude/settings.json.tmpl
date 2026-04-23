@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(glab:*)",
+      "Bash(git:*)",
+      "Read(~/.claude/plugins/**)",
+      "Skill(gip-conventional-commit:*)",
+      "Skill(gitlab-workflow:*)",
+      "Skill(superpowers:*)",
+      "Skill(upgrade-gitlab:*)"
+    ],
+    "defaultMode": "default"
+  },
+  "model": "opus[1m]",
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "upgrade-gitlab@janus-claude-marketplace": true,
+    "gip-conventional-commit@janus-claude-marketplace": true,
+    "gitlab-workflow@janus-claude-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "janus-claude-marketplace": {
+      "source": {
+        "source": "git",
+        "url": "git@gitlab:/gip/teams/g-janus/janus_claude_marketplace.git"
+      }
+    }
+  },
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "voiceEnabled": true
+}
