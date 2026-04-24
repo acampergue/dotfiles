@@ -1,4 +1,4 @@
 {{- if ne .env "gip" }}
 .config/gpm
-.m2/settings.xml
+.m2/
 {{- end }}
