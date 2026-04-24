@@ -122,9 +122,11 @@ fi
 
 source $ZSH/oh-my-zsh.sh
 
+{{- if eq .env "gip" }}
 # export QT_QPA_PLATFORMTHEME=qt5ct:qt6ct
 export QT_QPA_PLATFORMTHEME=qt6ct
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+{{- end }}
 export EDITOR=nvim
 
 eval "$(atuin init zsh --disable-up-arrow)"
