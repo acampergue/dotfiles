@@ -99,6 +99,7 @@ plugins=(
 # else
 #   export EDITOR='nvim'
 # fi
+export EDITOR=nvim
 
 # Compilation flags
 # export ARCHFLAGS="-arch $(uname -m)"
@@ -127,7 +128,6 @@ source $ZSH/oh-my-zsh.sh
 export QT_QPA_PLATFORMTHEME=qt6ct
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 {{- end }}
-export EDITOR=nvim
 
 eval "$(atuin init zsh --disable-up-arrow)"
 eval "$(zoxide init zsh)"
