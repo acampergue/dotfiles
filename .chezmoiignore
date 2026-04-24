@@ -1,0 +1,3 @@
+{{- if ne .env "gip" }}
+.config/gpm
+{{- end }}
