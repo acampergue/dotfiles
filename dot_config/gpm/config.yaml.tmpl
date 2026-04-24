@@ -1,3 +1,4 @@
+{{- if eq .env "gip" }}
 sources:
   - type: gitlab
     host: gitlab.intern.gipmbh.de
@@ -12,3 +13,4 @@ jira:
   url: https://jira.gipmbh.de
   project: P0909
 tasks_dir: ~/workspace/gpm/repos/tasks
+{{- end }}
