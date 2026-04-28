@@ -1,0 +1,29 @@
+output "BNQ BenQ BL2790QT L7P01778019" alias $right
+output "BNQ BenQ BL3290QT F7P00718019" alias $center
+output "BNQ BenQ BL2790QT L7P01760019" alias $left
+output "BOE 0x0A85 Unknown" alias $laptop
+output "BNQ BenQ GW2480 ETN9P01643SL0" alias $top
+
+profile desk {
+    output $laptop disable
+
+    output $left enable position 0,1080 transform 90
+    output $center enable position 1440,1080
+    output $right enable position 4000,1080 transform 270
+    output $top enable position 1760,0
+
+    exec ~/.config/kanshi/scripts/apply-desk.sh
+}
+
+profile desknohdmi {
+    output $laptop enable position 0,1080
+    output $center enable position 1920,1080
+    output $right enable position 4480,1080 transform 270
+    output $top enable position 2240,0
+
+    exec ~/.config/kanshi/scripts/apply-desknohdmi.sh
+}
+
+profile nomad {
+    output $laptop enable
+}
