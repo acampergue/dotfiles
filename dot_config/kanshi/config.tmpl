@@ -1,3 +1,4 @@
+{{- if eq .env "gip" }}
 output "BNQ BenQ BL2790QT L7P01778019" alias $right
 output "BNQ BenQ BL3290QT F7P00718019" alias $center
 output "BNQ BenQ BL2790QT L7P01760019" alias $left
@@ -27,3 +28,4 @@ profile desknohdmi {
 profile nomad {
     output $laptop enable
 }
+{{- end }}
