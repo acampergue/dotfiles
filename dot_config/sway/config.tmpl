@@ -292,6 +292,7 @@ default_border none
 default_floating_border none
 
 exec autotiling-rs
+{{- if eq .env "gip" }}
 exec sh -c '/opt/teams-for-linux/teams-for-linux --enable-features=UseOzonePlatform,WaylandWindowDecorations,WebRTCPipeWireCapturer --ozone-platform=wayland'
 # exec sh -c '/opt/outlook-for-linux/outlook-for-linux --enable-features=UseOzonePlatform,WaylandWindowDecorations --ozone-platform=wayland'
 # Keepassxc requires qt5-wayland and/or qt6-wayland to be installed
@@ -301,6 +302,7 @@ exec mousepad ~/Documents/journal_de_bord.md
 # exec_always sh -c 'pkill kanshi 2>/dev/null; swaymsg "output eDP-1 disable" ; sleep 1 ; kanshi > ~/.cache/kanshi.log 2>&1'
 exec_always sh -c '~/bin/restart_kanshi_gip.sh > ~/.cache/kanshi.log 2>&1'
 # exec sh -c 'swaymsg "output eDP-1 disable"; kanshi > ~/.cache/kanshi.log 2>&1'
+{{- end }}
 
 include ~/.config/sway/config.d/*
 include /etc/sway/config.d/*
