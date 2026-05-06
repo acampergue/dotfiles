@@ -53,7 +53,7 @@ ist <Artikel> noch zu haben?
 
 Darf ich fragen, aus welchem Grund Sie verkaufen?
 
-<Closing>, Aurelien
+<Closing>, Aurélien
 ```
 
 **Second question per language + register** (use this exact phrasing — it's the user's preferred wording):
@@ -84,9 +84,9 @@ If the user **did** explicitly add points (price offer, pickup, condition questi
 - EN: `Hello,` / `Hi,`
 
 **Closing + signature** (always one line, comma-separated):
-- DE: `Viele Grüße, Aurelien`
-- FR: `Cordialement, Aurelien` (formal) / `Bien à toi, Aurelien` (informal)
-- EN: `Best regards, Aurelien` (formal) / `Best, Aurelien` (informal)
+- DE: `Viele Grüße, Aurélien`
+- FR: `Cordialement, Aurélien` (formal) / `Bien à toi, Aurélien` (informal)
+- EN: `Best regards, Aurélien` (formal) / `Best, Aurélien` (informal)
 
 ## Follow-up message
 
@@ -125,7 +125,7 @@ The user gives the gist of what they want to reply. You formulate it short, poli
 
 <Body, 1–3 short paragraphs>
 
-<Closing>, Aurelien
+<Closing>, Aurélien
 ```
 
 Optional final line if you softened/removed something:
@@ -138,7 +138,7 @@ Hinweis: / Note : / Note: <one line, including a strafbar flag if applicable>
 - ❌ Defaulting to Du because "KA culture is Du" — **default is Sie** for this user; only switch on explicit signal.
 - ❌ Bundling counter-offer / extra questions into the first message — first message has two questions, that's it.
 - ❌ Inventing item details the user didn't mention (Akkuzyklen, Kratzer, …).
-- ❌ Adding an `[Ihr Name]` placeholder — always sign `Aurelien`.
+- ❌ Adding an `[Ihr Name]` placeholder — always sign `Aurélien`.
 - ❌ Skipping the `Hinweis:` / `Note:` line when content was rewritten.
 - ❌ Producing a "milder" version of a threat / insult / discrimination — these get **dropped**, not softened.
 - ❌ Long flowery messages — KA culture is short and direct.
