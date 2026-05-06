@@ -57,8 +57,8 @@ The user's personal mail client does **not** auto-append a signature. Always clo
 ```
 
 **Name to use:**
-- Casual register → `Aurelien`
-- Formal register → `Aurelien Campergue`
+- Casual register → `Aurélien`
+- Formal register → `Aurélien Campergue`
 
 **Closing line per language + register:**
 
@@ -114,7 +114,7 @@ Betreff / Objet / Subject: <konkret>
 <Body, 1–4 short paragraphs>
 
 <Closing>
-Aurelien   ← or "Aurelien Campergue" if formal
+Aurélien   ← or "Aurélien Campergue" if formal
 ```
 
 Optional final line if you softened something:
@@ -125,7 +125,7 @@ Hinweis: / Note : / Note: <one line>
 ## Common mistakes
 
 - ❌ Not asking the language and auto-picking from input/recipient — **always ask** unless the user explicitly stated it.
-- ❌ Leaving `[Your Name]` / `[Ihr Name]` / `[Votre nom]` placeholder — use `Aurelien` (casual) or `Aurelien Campergue` (formal).
+- ❌ Leaving `[Your Name]` / `[Ihr Name]` / `[Votre nom]` placeholder — use `Aurélien` (casual) or `Aurélien Campergue` (formal).
 - ❌ Skipping the `Hinweis:` line when sarcasm/slang/aggression was rewritten — the user wants to see what changed, every time.
 - ❌ Mixing languages in the output (FR phrase slipping into DE email) — the user mixes in input on purpose; the **output** must be one clean language.
 - ❌ Using formal Sie/vous with friends or casual Du/tu with Hausverwaltung/Steuerberater.
