@@ -38,8 +38,16 @@ Once chosen, stay consistent throughout (Anrede, pronouns, closing).
 
 **Anrede (opening):**
 - Formal Sie: `Sehr geehrte Frau <Nachname>,` / `Sehr geehrter Herr <Nachname>,`
-- Formal Sie, unknown name: `Sehr geehrte Damen und Herren,`
+- Formal Sie, unknown name (no recipient given at all): `Sehr geehrte Damen und Herren,`
 - Formal Du (colleague): `Hallo <Vorname>,` or `Hi <Vorname>,`
+
+**Missing last name in Sie register — ask once, do not use a placeholder:**
+
+If the register is **Sie** and the user gave only a first name (e.g. "Stefan"), do **not** draft with `[Nachname]` / `<Nachname>` / any placeholder. Instead, ask once before drafting:
+
+> Wie ist der Nachname von <Vorname>? (Für die Anrede „Sehr geehrter Herr / Sehr geehrte Frau …")
+
+Wait for the answer, then draft. If the user replies "kein Nachname" / "weiß nicht" / "egal", fall back to `Sehr geehrte Damen und Herren,`. Never leave a placeholder in the output.
 
 **Schluss (closing):**
 - Sie: `Mit freundlichen Grüßen`
