@@ -51,10 +51,23 @@ Short. Polite. Two questions only, unless the user explicitly asks for more.
 
 ist <Artikel> noch zu haben?
 
-Falls ja: aus welchem Grund verkaufen Sie <es/ihn/sie>?
+Darf ich fragen, aus welchem Grund Sie verkaufen?
 
 <Closing>, Aurelien
 ```
+
+**Second question per language + register** (use this exact phrasing — it's the user's preferred wording):
+
+| Language | Register | Phrasing |
+|---|---|---|
+| DE | Sie | `Darf ich fragen, aus welchem Grund Sie verkaufen?` |
+| DE | Du | `Darf ich fragen, aus welchem Grund du verkaufst?` |
+| FR | vous | `Puis-je vous demander pour quelle raison vous vendez ?` |
+| FR | tu | `Puis-je te demander pour quelle raison tu vends ?` |
+| EN | formal | `May I ask why you're selling?` |
+| EN | casual | `May I ask why you're selling?` |
+
+Do **not** use `Falls ja:` / `If yes:` / `Si oui :` — phrase the second question as a polite stand-alone question.
 
 **Do NOT** in a first message:
 - bundle in price negotiation / counter-offers (those go in a follow-up after the seller replies)
