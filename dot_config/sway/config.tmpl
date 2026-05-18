@@ -17,6 +17,7 @@ set $right l
 # set $term wezterm
 set $term kitty
 # Your preferred application launcher
+# set $menu wmenu-run
 set $menu fuzzel
 
 ### Output configuration
@@ -167,15 +168,18 @@ bindsym $mod+Shift+e mode $mode_shutdown
     bindsym $mod+9 workspace number 9
     bindsym $mod+0 workspace number 10
     # Move focused container to workspace
-#    bindsym $mod+Shift+0 exec ~/.config/sway/scripts/swap_window.sh 0
+{{- if eq .env "gip" }}
     bindsym $mod+Shift+1 exec ~/.config/sway/scripts/swap_windows.sh 1
     bindsym $mod+Shift+2 exec ~/.config/sway/scripts/swap_windows.sh 2
     bindsym $mod+Shift+3 exec ~/.config/sway/scripts/swap_windows.sh 3
     bindsym $mod+Shift+4 exec ~/.config/sway/scripts/swap_windows.sh 4
-#    bindsym $mod+Shift+1 move container to workspace number 1
-#    bindsym $mod+Shift+2 move container to workspace number 2
-#    bindsym $mod+Shift+3 move container to workspace number 3
-#    bindsym $mod+Shift+4 move container to workspace number 4
+{{- end }}
+{{- if eq .env "home" }}
+     bindsym $mod+Shift+1 move container to workspace number 1
+     bindsym $mod+Shift+2 move container to workspace number 2
+     bindsym $mod+Shift+3 move container to workspace number 3
+     bindsym $mod+Shift+4 move container to workspace number 4
+{{- end }}
     bindsym $mod+Shift+5 move container to workspace number 5
     bindsym $mod+Shift+6 move container to workspace number 6
     bindsym $mod+Shift+7 move container to workspace number 7
@@ -283,6 +287,8 @@ bar {
         background #323232
         inactive_workspace #32323200 #32323200 #5c5c5c
     }
+
+    status_command i3status
 }
 
 for_window [shell="xwayland"] title_format "[XWayland] %title"
@@ -304,6 +310,12 @@ exec mousepad ~/Documents/journal_de_bord.md
 exec_always sh -c '~/bin/restart_kanshi_gip.sh > ~/.cache/kanshi.log 2>&1'
 # exec sh -c 'swaymsg "output eDP-1 disable"; kanshi > ~/.cache/kanshi.log 2>&1'
 {{- end }}
+{{- if eq .env "home" }}
+# Keepassxc requires qt5-wayland and/or qt6-wayland to be installed
+exec sh -c 'secret-tool lookup keepass default | keepassxc --pw-stdin /home/acampergue/keepassxc/passwords.kdbx'
+exec_always sh -c '~/bin/restart_kanshi_gip.sh > ~/.cache/kanshi.log 2>&1'
+{{- end }}
+
 
 include ~/.config/sway/config.d/*
 include /etc/sway/config.d/*
