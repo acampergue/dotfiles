@@ -132,10 +132,3 @@ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 eval "$(atuin init zsh --disable-up-arrow)"
 eval "$(zoxide init zsh)"
 eval "$(direnv hook zsh)"
-
-# Save kitty session when this shell exits (ctrl+d on empty line, `exit`, etc.)
-zshexit() {
-  [[ -n $KITTY_WINDOW_ID ]] && kitten @ action save_as_session \
-    --save-only --use-foreground-process \
-    ~/.local/share/kitty/sessions/last.session 2>/dev/null
-}
