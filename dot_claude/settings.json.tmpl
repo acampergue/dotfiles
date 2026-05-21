@@ -9,9 +9,48 @@
       "Skill(superpowers:*)",
       "Skill(upgrade-gitlab:*)",
       {{- end }}
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(awk:*)",
+      "Bash(sed:*)",
+      "Bash(jq:*)",
+      "Bash(yq:*)",
+      "Bash(yamllint:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(file:*)",
+      "Bash(stat:*)",
+      "Bash(tree:*)",
+      "Bash(du:*)",
+      "Bash(df:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(diff:*)",
+      "Bash(cmp:*)",
+      "Bash(uname:*)",
+      "Bash(whoami:*)",
+      "Bash(which:*)",
+      "Bash(hostname:*)",
+      "Bash(env:*)",
+      "Bash(ps:*)",
+      "Bash(md5sum:*)",
+      "Bash(sha256sum:*)",
+      "Bash(base64:*)",
+      "Bash(xxd:*)",
+      "Bash(date:*)",
+      "Bash(docker image ls:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker run:*)",
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(.venv/bin/pytest:*)"
     ],
-    "defaultMode": "default"
+    "defaultMode": "auto"
   },
   "model": "opus[1m]",
   {{- if eq .env "gip" }}
@@ -30,9 +69,16 @@
     }
   },
   {{- end }}
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "effortLevel": "xhigh",
   "voice": {
     "enabled": true,
     "mode": "hold"
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "skipAutoPermissionPrompt": true
 }
