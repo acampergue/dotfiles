@@ -31,6 +31,20 @@ set $menu fuzzel
 #
 # You can get the names of your outputs by running: swaymsg -t get_outputs
 # output eDP-1 enable resolution 1920x1080
+{{- if eq .env "home" }}
+# 32" BenQ BL3290QT
+output "BNQ BenQ BL3290QT F7P00718019" power on resolution 2560x1440 position 0 -1440 scale 1 enable
+
+# 24" BenQ GW2480
+output "BNQ BenQ GW2480 ETN9P01643SL0" power on resolution 1920x1080 position 0 -2520 scale 1 enable
+
+# Écran du portable
+output "AU Optronics 0x2336 Unknown" power on resolution 2560x1440 position 0 0 scale 1.6 enable
+# output "AU Optronics 0x2336 Unknown" power on resolution 2560x1440 position 0 0 scale 2 enable
+
+# 27" BenQ BL2790QT désactivé en permanence
+output "BNQ BenQ BL2790QT L7P01778019" power off disable
+{{- end }}
 
 ### Idle configuration
 #
@@ -43,9 +57,14 @@ set $menu fuzzel
          # before-sleep 'swaylock -f -c 000000'
 
 exec swayidle -w \
-          timeout 900 'swaylock -f -c 000000' \
-          # timeout 1800 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-          before-sleep 'swaylock -f -c 000000'
+         timeout 900 'swaylock -f -c 000000' \
+{{- if eq .env "gip" }}
+         # timeout 1800 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+{{- end }}
+{{- if eq .env "home" }}
+         timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+{{- end }}
+         before-sleep 'swaylock -f -c 000000'
 
 # This will lock your screen after 300 seconds of inactivity, then turn off
 # your displays after another 300 seconds, and turn your screens back on when
