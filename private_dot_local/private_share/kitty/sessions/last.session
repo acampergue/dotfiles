@@ -1,0 +1,3 @@
+# Initial fallback session. Overwrite with Ctrl+Shift+S from Kitty.
+layout splits
+launch
