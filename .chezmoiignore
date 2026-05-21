@@ -2,3 +2,4 @@
 .config/gpm
 .m2/
 {{- end }}
+.local/share/kitty/sessions/last.session
