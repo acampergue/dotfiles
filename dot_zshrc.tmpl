@@ -127,12 +127,12 @@ fi
 
 source $ZSH/oh-my-zsh.sh
 
-# export QT_QPA_PLATFORMTHEME=qt5ct:qt6ct
 export QT_QPA_PLATFORMTHEME=qt6ct
+# export QT_QPA_PLATFORMTHEME=qt5ct:qt6ct
 export BUILDKIT_PROGRESS=plain
 {{- if eq .env "gip" }}
 export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
-export INSTALL4J_JAVA_HOME=/usr/lib/jvm/java-11-openjdk/
+# export INSTALL4J_JAVA_HOME=/usr/lib/jvm/java-11-openjdk/
 # export WLR_DRM_NO_MODIFIERS=1
 {{- end }}
 
