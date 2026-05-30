@@ -12,4 +12,7 @@ encryption = "age"
     name = {{ $name | quote }}
     email = {{ $email | quote }}
     env = {{ $env | quote }}
+[merge]
+    command = "meld"
+    args = ["{{ .Destination }}", "{{ .Source }}", "{{ .Target }}", "--output={{ .Source }}"]
 
