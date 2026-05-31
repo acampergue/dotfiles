@@ -31,31 +31,17 @@ profile nomad {
 {{- end }}
 {{- if eq .env "home" }}
 profile home {
-    output "BNQ BenQ BL3290QT F7P00718019" {
-        enable
-        mode 2560x1440
-        position 0,-1440
-        scale 1
-    }
+    output "BNQ BenQ BL3290QT F7P00718019"
 
-    output "BNQ BenQ GW2480 ETN9P01643SL0" {
-        enable
-        mode 1920x1080
-        position 0,-2520
-        scale 1
-    }
+    output "BNQ BenQ GW2480 ETN9P01643SL0"
 
-    # Laptop screen
+    output "BNQ BenQ BL2790QT L7P01778019"
+
     output "AU Optronics 0x2336 Unknown" {
-        enable
-        mode 2560x1440
-        position 0,0
-        scale 1.6
+        disable
     }
 
-    output "BNQ BenQ BL2790QT L7P01778019" {
-      disable
-    }
+    exec /home/acampergue/.config/kanshi/scripts/home
 }
 
 profile laptop {
