@@ -1,6 +1,8 @@
+{{- if eq .env "home" }}
 #!/bin/sh
 
 swaymsg output '"BNQ BenQ GW2480 ETN9P01643SL0"' enable resolution 1920x1080 position 0 0 scale 1
 swaymsg output '"BNQ BenQ BL3290QT F7P00718019"' enable resolution 2560x1440 position 0 1080 scale 1
 swaymsg output '"BNQ BenQ BL2790QT L7P01778019"' enable resolution 2560x1440 position 2560 1080 scale 1 transform 90
 swaymsg output '"AU Optronics 0x2336 Unknown"' disable
+{{- end }}
