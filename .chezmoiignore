@@ -2,4 +2,8 @@
 .config/gpm
 .m2/
 {{- end }}
+{{- if ne .env "home" }}
+.config/hypr
+.config/waybar
+{{- end }}
 .local/share/kitty/sessions/last.session
