@@ -119,6 +119,9 @@ export EDITOR=nvim
 # Example aliases
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
+{{- if eq .env "gip" }}
+alias gipm='~/workspace/gipm/.venv/bin/gipm'
+{{- end }}
 
 ZSH_CACHE_DIR=$HOME/.cache/oh-my-zsh
 if [[ ! -d $ZSH_CACHE_DIR ]]; then
