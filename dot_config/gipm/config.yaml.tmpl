@@ -8,9 +8,12 @@ sources:
     host: git.intern.gipmbh.de
     projects:
       - '*'
-base_dir: ~/workspace/gipm/repos
+base_dir: ~/workspace
 jira:
   url: https://jira.gipmbh.de
   project: P0909
-tasks_dir: ~/workspace/gipm/repos/tasks
+  transitions:
+    start: In Bearbeitung
+    close: Abgeschlossen
+tasks_dir: ~/workspace/tasks
 {{- end }}
