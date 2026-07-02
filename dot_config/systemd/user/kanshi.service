@@ -1,0 +1,12 @@
+# ~/.config/systemd/user/kanshi.service
+[Unit]
+Description=kanshi output daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/kanshi
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
