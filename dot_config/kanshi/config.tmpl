@@ -8,19 +8,19 @@ output "BNQ BenQ GW2480 ETN9P01643SL0" alias $top
 profile desk {
     output $laptop disable
 
-    output $left enable position 0,1080 transform 90
-    output $center enable position 1440,1080
-    output $right enable position 4000,1080 transform 270
-    output $top enable position 1760,0
+    output $left   enable mode 2560x1440@59.951Hz position 0,1080 transform 90
+    output $center enable mode 2560x1440@59.951Hz position 1440,1080
+    output $right  enable mode 2560x1440@59.951Hz position 4000,1080 transform 270
+    output $top    enable mode 1920x1080@60Hz     position 1760,0
 
     exec ~/.config/kanshi/scripts/apply-desk.sh
 }
 
 profile desknohdmi {
-    output $laptop enable position 0,1080
-    output $center enable position 1920,1080
-    output $right enable position 4480,1080 transform 270
-    output $top enable position 2240,0
+    output $laptop enable mode 1920x1080@59.999Hz position 0,1080
+    output $center enable mode 2560x1440@59.951Hz position 1920,1080
+    output $right  enable mode 2560x1440@59.951Hz position 4480,1080 transform 270
+    output $top    enable mode 1920x1080@60Hz     position 2240,0
 
     exec ~/.config/kanshi/scripts/apply-desknohdmi.sh
 }

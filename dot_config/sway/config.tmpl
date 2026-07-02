@@ -4,6 +4,8 @@
 #
 # Read `man 5 sway` for a complete reference.
 
+output eDP-1 disable
+
 ### Variables
 #
 # Logo key. Use Mod1 for Alt.
@@ -60,16 +62,12 @@ set $menu fuzzel
 exec swayidle -w \
          timeout 900 'swaylock -f -c 000000' \
 {{- if eq .env "gip" }}
-         timeout 1800 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+         timeout 1800 'swaymsg "output eDP-1 power off"' resume 'swaymsg "output eDP-1 power on"' \
 {{- end }}
 {{- if eq .env "home" }}
          timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
 {{- end }}
          before-sleep 'swaylock -f -c 000000'
-
-# This will lock your screen after 300 seconds of inactivity, then turn off
-# your displays after another 300 seconds, and turn your screens back on when
-# resumed. It will also lock your screen before your computer goes to sleep.
 
 ### Input configuration
 #
@@ -327,8 +325,8 @@ exec sh -c 'secret-tool lookup keepass default | keepassxc --pw-stdin /home/acam
 exec mousepad ~/Documents/journal_de_bord.md
 # exec_always sh -c 'pkill kanshi 2>/dev/null; sleep 1 ; swaymsg "output HDMI-A-1 disable ; output eDP-1 disable" ; sleep 2 ; kanshi > ~/.cache/kanshi.log 2>&1'
 # exec_always sh -c 'pkill kanshi 2>/dev/null; swaymsg "output eDP-1 disable" ; sleep 1 ; kanshi > ~/.cache/kanshi.log 2>&1'
-exec_always sh -c '~/bin/restart_kanshi_gip.sh > ~/.cache/kanshi.log 2>&1'
-# exec sh -c 'swaymsg "output eDP-1 disable"; kanshi > ~/.cache/kanshi.log 2>&1'
+exec systemctl --user import-environment WAYLAND_DISPLAY SWAYSOCK XDG_CURRENT_DESKTOP
+exec_always systemctl --user restart kanshi
 {{- end }}
 {{- if eq .env "home" }}
 # Keepassxc requires qt5-wayland and/or qt6-wayland to be installed
