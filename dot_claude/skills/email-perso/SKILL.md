@@ -1,6 +1,7 @@
 ---
 name: email-perso
 description: Use when the user asks to write/draft a personal (non-work) email — triggered by phrases like "write a perso email", "write an email perso", "write a personal email", "draft a perso email", or the slash command /email-perso. Output language is asked every time (default German). Recipients can be friends, family, landlord, doctor, Behörden, online services.
+model: sonnet
 ---
 
 # email-perso

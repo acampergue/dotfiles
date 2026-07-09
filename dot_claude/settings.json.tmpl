@@ -53,6 +53,19 @@
     "defaultMode": "auto"
   },
   "model": "opus[1m]",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/acampergue/.claude/hooks/session-time.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
   {{- if eq .env "gip" }}
   "enabledPlugins": {
     "superpowers@claude-plugins-official": true,
@@ -72,12 +85,12 @@
   "sandbox": {
     "enabled": true,
     "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
     "filesystem": {
       "allowWrite": [
         "/home/acampergue/workspace"
       ]
-    },
-    "autoAllowBashIfSandboxed": true
+    }
   },
   "effortLevel": "xhigh",
   "tui": "fullscreen",

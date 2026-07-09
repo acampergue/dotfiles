@@ -1,6 +1,7 @@
 ---
 name: email-pro
 description: Use when the user asks to write/draft a professional work email — triggered by phrases like "write a pro email", "write an pro email", "draft a pro email", or the slash command /email-pro. Input may be in German, English, or French; output is always professional German.
+model: sonnet
 ---
 
 # email-pro

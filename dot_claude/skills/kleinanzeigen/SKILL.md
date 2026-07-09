@@ -1,6 +1,7 @@
 ---
 name: kleinanzeigen
 description: Use when the user asks to write a Kleinanzeigen (or other classified-ad) message — triggered by "kleinanzeigen", "annonce", or the slash commands /kleinanzeigen and /annonce. Handles first-contact messages and follow-ups to sellers/buyers. Default language German, default register formal Sie. Strips threats, coercion, insults, defamation, and fraud — anything that could be strafbar in DE/FR.
+model: sonnet
 ---
 
 # kleinanzeigen
