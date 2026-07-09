@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# UserPromptSubmit hook: inject the session's active work time into Claude's
+# context so it can propose a Tempo booking (gipm time log) at ticket wrap-up.
+# Active time = sum of gaps between consecutive transcript messages, ignoring
+# gaps > 15 min (user away). Wall time = last - first timestamp.
+
+input=$(cat)
+transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
+[ -n "$transcript" ] && [ -f "$transcript" ] || { echo '{}'; exit 0; }
+
+read -r active wall < <(jq -rs '
+  [ .[] | .timestamp? // empty | strings ]
+  | map(sub("\\.[0-9]+"; "") | fromdateiso8601? // empty)
+  | . + [now]
+  | sort
+  | if length < 2 then "0 0" else
+      . as $t
+      | ([ range(1; length) | ($t[.] - $t[.-1]) | select(. > 0 and . <= 900) ] | add // 0) as $active
+      | "\($active | floor) \(($t[-1] - $t[0]) | floor)"
+    end
+' "$transcript" 2>/dev/null)
+
+[ -n "$active" ] || { echo '{}'; exit 0; }
+
+fmt() { printf '%dh%02dm' $(( $1 / 3600 )) $(( ($1 % 3600) / 60 )); }
+
+ctx="[session-time] Active work time this session: $(fmt "$active") (wall clock: $(fmt "$wall"); gaps > 15 min counted as away). Use this when proposing a Tempo time booking at ticket/task wrap-up (see CLAUDE.md 'Time booking')."
+
+jq -n --arg ctx "$ctx" '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $ctx}}'
