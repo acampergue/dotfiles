@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekday reminders for the /morgen Claude skill
+
+[Timer]
+OnCalendar=Mon..Fri 08:15
+OnCalendar=Mon..Fri 08:30
+# Fire once at boot if the machine was off at the scheduled times
+# (the marker check keeps it quiet when /morgen already ran).
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,6 @@
+[Unit]
+Description=Reminder to run the /feierabend Claude skill
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/ritual-reminder.sh feierabend

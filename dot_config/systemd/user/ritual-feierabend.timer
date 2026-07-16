@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekday reminders for the /feierabend Claude skill
+
+[Timer]
+OnCalendar=Mon..Fri 18:00
+OnCalendar=Mon..Fri 22:00
+# No catch-up: a missed 22:00 ping must not fire the next morning.
+Persistent=false
+
+[Install]
+WantedBy=timers.target
