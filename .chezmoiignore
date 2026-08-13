@@ -1,6 +1,8 @@
 {{- if ne .env "gip" }}
 .config/gpm
 .m2/
+.claude/hooks/session-registry.sh
+bin/claude-sessions
 {{- end }}
 {{- if ne .env "home" }}
 .config/hypr
