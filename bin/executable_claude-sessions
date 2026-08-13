@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""List Claude Code sessions from the hook-maintained registry.
+
+Registry: ~/.claude/sessions-registry/ (written by ~/.claude/hooks/session-registry.sh)
+
+Usage:
+  claude-sessions               open + resumable sessions (table)
+  claude-sessions --all         also show cleanly-ended sessions
+  claude-sessions --md          markdown output (e.g. claude-sessions --md > snapshot.md)
+  claude-sessions --forget ID   remove one registry entry
+"""
+import glob
+import json
+import os
+import sys
+
+REG = os.path.expanduser(
+    os.environ.get("CLAUDE_SESSION_REGISTRY_DIR", "~/.claude/sessions-registry")
+)
+
+
+def claude_alive(pid):
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as f:
+            return b"claude" in f.read()
+    except (OSError, ValueError):
+        return False
+
+
+def main():
+    args = sys.argv[1:]
+    if "--forget" in args:
+        sid = args[args.index("--forget") + 1]
+        path = os.path.join(REG, sid + ".json")
+        os.remove(path)
+        print(f"removed {path}")
+        return
+    show_all = "--all" in args
+    md = "--md" in args
+
+    rows = []
+    for f in glob.glob(os.path.join(REG, "*.json")):
+        try:
+            with open(f) as fh:
+                e = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if e.get("ended"):
+            status = "ended"
+        elif e.get("pid") and claude_alive(e["pid"]):
+            status = "open"
+        else:
+            # registered but no live claude process: killed, reboot, or unknown pid
+            status = "resumable"
+        if status == "ended" and not show_all:
+            continue
+        e["status"] = status
+        rows.append(e)
+
+    rows.sort(key=lambda e: e.get("last_activity", ""), reverse=True)
+    if not rows:
+        print("no sessions in registry" + ("" if show_all else " (try --all)"))
+        return
+
+    home = os.path.expanduser("~")
+    for e in rows:
+        e["path"] = (e.get("cwd") or "?").replace(home, "~")
+        e["when"] = (e.get("last_activity") or "")[:16].replace("T", " ")
+        e["desc"] = (e.get("description") or "").strip() or "-"
+
+    if md:
+        print("| Status | Path | Resume ID | Last activity | Description |")
+        print("|---|---|---|---|---|")
+        for e in rows:
+            desc = e["desc"].replace("|", "\\|")
+            print(
+                f"| {e['status']} | `{e['path']}` | `{e['session_id']}` "
+                f"| {e['when']} | {desc} |"
+            )
+    else:
+        wpath = max(len(e["path"]) for e in rows)
+        for e in rows:
+            print(
+                f"{e['status']:<10} {e['path']:<{wpath}}  {e['session_id']}  "
+                f"{e['when']}  {e['desc'][:60]}"
+            )
+        print(f"\n{len(rows)} session(s). Resume: cd <path> && claude --resume <id>")
+
+
+if __name__ == "__main__":
+    main()
