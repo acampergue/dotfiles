@@ -81,7 +81,7 @@ def main():
         for e in rows:
             print(
                 f"{e['status']:<10} {e['when']}  {e['cmd']:<{wcmd}}  "
-                f"{e['desc'][:50]}"
+                f"{e['desc'][:120]}"
             )
         print(f"\n{len(rows)} session(s)")
 
