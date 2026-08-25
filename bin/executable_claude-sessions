@@ -64,27 +64,25 @@ def main():
 
     home = os.path.expanduser("~")
     for e in rows:
-        e["path"] = (e.get("cwd") or "?").replace(home, "~")
+        path = (e.get("cwd") or "?").replace(home, "~")
+        e["cmd"] = f"cd {path} && claude --resume {e['session_id']}"
         e["when"] = (e.get("last_activity") or "")[:16].replace("T", " ")
         e["desc"] = (e.get("description") or "").strip() or "-"
 
     if md:
-        print("| Status | Path | Resume ID | Last activity | Description |")
-        print("|---|---|---|---|---|")
+        print("| Status | Last activity | Resume command | Description |")
+        print("|---|---|---|---|")
         for e in rows:
             desc = e["desc"].replace("|", "\\|")
-            print(
-                f"| {e['status']} | `{e['path']}` | `{e['session_id']}` "
-                f"| {e['when']} | {desc} |"
-            )
+            print(f"| {e['status']} | {e['when']} | `{e['cmd']}` | {desc} |")
     else:
-        wpath = max(len(e["path"]) for e in rows)
+        wcmd = max(len(e["cmd"]) for e in rows)
         for e in rows:
             print(
-                f"{e['status']:<10} {e['path']:<{wpath}}  {e['session_id']}  "
-                f"{e['when']}  {e['desc'][:60]}"
+                f"{e['status']:<10} {e['when']}  {e['cmd']:<{wcmd}}  "
+                f"{e['desc'][:50]}"
             )
-        print(f"\n{len(rows)} session(s). Resume: cd <path> && claude --resume <id>")
+        print(f"\n{len(rows)} session(s)")
 
 
 if __name__ == "__main__":
