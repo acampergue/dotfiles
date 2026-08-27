@@ -52,7 +52,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -119,7 +119,8 @@
     "autoAllowBashIfSandboxed": true,
     "filesystem": {
       "allowWrite": [
-        "/home/acampergue/workspace"
+        "/home/acampergue/workspace",
+        "/home/acampergue/.claude/sessions-registry"
       ]
     }
   },
@@ -130,5 +131,42 @@
     "mode": "hold"
   },
   "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(glab:*) in this repo — routine GitLab CLI usage (146× observed, primary workflow tool)",
+      "Bash(kubectl get:*), Bash(kubectl describe:*), Bash(kubectl logs:*) against team-janus/cicd-workers/cicd-workers-agents namespaces — routine read-only cluster inspection (65× observed)"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Bash(kubectl delete:*), Bash(kubectl apply:*), Bash(kubectl scale:*) against team-janus/cicd-workers* namespaces — cluster mutation beyond routine reads"
+    ],
+    "environment": [
+      "### Org-wide",
+      "**Organization**: GIP GmbH (German company), team G-Janus",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: assume private (host gitlab.intern.gipmbh.de is an internal GitLab instance; not queryable via gh — internal hostname indicates non-public)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: main (default branch); protection/rulesets not queryable here (origin is a self-hosted GitLab host, not a gh-supported owner/repo shape)",
+      "**CI/CD deploy targets**: Jenkins at jenkins.cicd.intern.gipmbh.de, jenkins-test.janus.gip.kubernetes.intern.gipmbh.de, team-janus-jenkins-master-test.intern.gipmbh.de (this project's CI/CD hosts)",
+      "**Network posture**: None configured",
+      "**Source control**: origin ssh://gitlab.intern.gipmbh.de:7999/cicd/gip-projects-management.git (this repo's only configured remote)",
+      "**Trusted internal domains**: git.intern.gipmbh.de, jira.gipmbh.de, jira.intern.gipmbh.de, jenkins.cicd.intern.gipmbh.de, artifactory.intern.gipmbh.de, repo.intern.gipmbh.de, central-docker-base-release-local.intern.gipmbh.de, infomedia.gipmbh.de, central-docker-appofficial-release-local.intern.gipmbh.de, central-docker-release.intern.gipmbh.de, jenkins-test.janus.gip.kubernetes.intern.gipmbh.de, bitbucket.intern.gipmbh.de, team-janus-jenkins-master-test.intern.gipmbh.de, gitlab.intern.gipmbh.de, central-docker-base-dev-local.intern.gipmbh.de, jenkins-test.team-janus.svc.cluster.local (hosts contacted in this project's transcripts)",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: glab (GitLab CLI, authenticated against gitlab.intern.gipmbh.de), JIRA REST API (jira.gipmbh.de / jira.intern.gipmbh.de), Bitbucket Server REST API (bitbucket.intern.gipmbh.de), Tempo worklogs (via JIRA)",
+      "**Internal package registry**: Artifactory (artifactory.intern.gipmbh.de, repo.intern.gipmbh.de), Harbor-style docker registries under intern.gipmbh.de (central-docker-*-local.intern.gipmbh.de)",
+      "**Sensitive data locations & audiences**: JIRA_USERNAME/JIRA_PASSWORD and BITBUCKET_USERNAME/BITBUCKET_PASSWORD env vars; ~/.config/gipm/config.yaml; .envrc (gitignored); k8s namespace team-janus and related cicd-workers/cicd-workers-agents namespaces — share only with GIP/team G-Janus personnel",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment",
+      "**Protected deployment namespaces / environments**: team-janus, cicd-workers, cicd-workers-agents, cicd (k8s namespaces used by this project's CI/CD workflows)",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: release engineering — GitLab/Bitbucket/JIRA-integrated ticket and MR workflows via the `gipm` CLI, in this repo",
+      "**Trusted repo**: /home/acampergue/workspace/gipm (this checkout) and its origin remote ssh://gitlab.intern.gipmbh.de:7999/cicd/gip-projects-management.git",
+      "**Org-specific CLIs**: `gipm` (~/workspace/gipm/.venv/bin/gipm — GIP repo/ticket/MR/worklog workflows), `glab` (GitLab CLI against gitlab.intern.gipmbh.de), `kubectl` (against team-janus and cicd-workers* namespaces)",
+      "Never merge a merge request/PR automatically in this repo — merging requires the user's explicit per-MR instruction; creating/updating/pushing branches and MRs is routine"
+    ]
+  },
   "voiceEnabled": true
 }

@@ -1,22 +1,43 @@
 #!/usr/bin/env python3
-"""List Claude Code sessions from the hook-maintained registry.
+"""List and mark Claude Code sessions from the hook-maintained registry.
 
 Registry: ~/.claude/sessions-registry/ (written by ~/.claude/hooks/session-registry.sh)
 
 Usage:
   claude-sessions               open + resumable sessions (table)
-  claude-sessions --all         also show cleanly-ended sessions
+  claude-sessions --all         also show done and gone sessions, with the reason
   claude-sessions --md          markdown output (e.g. claude-sessions --md > snapshot.md)
   claude-sessions --forget ID   remove one registry entry
+  claude-sessions --done [ID] --desc TEXT [--note TEXT]
+                                mark a session finished (ID defaults to
+                                $CLAUDE_CODE_SESSION_ID; --note "" clears the note)
+  claude-sessions --undone [ID] clear the done mark
 """
+import argparse
+import functools
 import glob
 import json
 import os
 import sys
+import tempfile
+from datetime import datetime
 
+BASE = os.path.expanduser(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"))
 REG = os.path.expanduser(
-    os.environ.get("CLAUDE_SESSION_REGISTRY_DIR", "~/.claude/sessions-registry")
+    os.environ.get("CLAUDE_SESSION_REGISTRY_DIR", os.path.join(BASE, "sessions-registry"))
 )
+PROJ = os.path.expanduser(
+    os.environ.get("CLAUDE_SESSIONS_PROJECTS_DIR", os.path.join(BASE, "projects"))
+)
+
+# statuses kept out of the default listing
+HIDDEN_BY_DEFAULT = ("done", "gone")
+
+# end_reason values that mean the user closed the session on purpose
+CLEAN_EXIT_REASONS = ("prompt_input_exit", "clear", "logout", "exit", "resume")
+
+# the hook truncates descriptions to 200 chars; stay consistent
+DESC_MAX = 200
 
 
 def claude_alive(pid):
@@ -27,34 +48,172 @@ def claude_alive(pid):
         return False
 
 
-def main():
-    args = sys.argv[1:]
-    if "--forget" in args:
-        sid = args[args.index("--forget") + 1]
-        path = os.path.join(REG, sid + ".json")
-        os.remove(path)
-        print(f"removed {path}")
-        return
-    show_all = "--all" in args
-    md = "--md" in args
+@functools.lru_cache(maxsize=1)
+def boot_time():
+    """Epoch seconds of the last boot; 0.0 when unavailable (guard disabled)."""
+    try:
+        with open("/proc/stat") as fh:
+            for line in fh:
+                if line.startswith("btime "):
+                    return float(line.split()[1])
+    except OSError:
+        pass
+    return 0.0
 
-    rows = []
+
+@functools.lru_cache(maxsize=1)
+def transcript_ids():
+    """Session ids that still have a transcript, so `claude --resume` can work."""
+    return {
+        os.path.basename(p)[: -len(".jsonl")]
+        for p in glob.glob(os.path.join(PROJ, "*", "*.jsonl"))
+    }
+
+
+def activity_ts(e):
+    """last_activity as epoch seconds, or None when missing/unparseable."""
+    try:
+        return datetime.fromisoformat(e["last_activity"]).timestamp()
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def is_open(e):
+    ts = activity_ts(e)
+    if ts is not None and ts < boot_time():
+        return False  # every claude process died at the last boot
+    return bool(e.get("pid")) and claude_alive(e["pid"])
+
+
+def status_of(e):
+    if e.get("done"):
+        return "done"
+    if is_open(e):
+        return "open"
+    if e.get("session_id") not in transcript_ids():
+        return "gone"  # no transcript: claude --resume would fail
+    if (e.get("end_reason") or "") not in CLEAN_EXIT_REASONS:
+        return "killed"  # SIGTERM/SIGHUP, or no SessionEnd at all
+    return "quit"
+
+
+def decorate(e):
+    """Add the derived display fields to an entry."""
+    home = os.path.expanduser("~")
+    path = (e.get("cwd") or "?").replace(home, "~")
+    e["cmd"] = f"cd {path} && claude --resume {e['session_id']}"
+    e["when"] = (e.get("last_activity") or "")[:16].replace("T", " ")
+    e["desc"] = (e.get("description") or "").strip() or "-"
+    e["reason"] = e.get("end_reason") or "-"
+    return e
+
+
+def read_entries():
+    entries = []
     for f in glob.glob(os.path.join(REG, "*.json")):
         try:
             with open(f) as fh:
-                e = json.load(fh)
+                entries.append(json.load(fh))
         except (OSError, json.JSONDecodeError):
             continue
-        if e.get("ended"):
-            status = "ended"
-        elif e.get("pid") and claude_alive(e["pid"]):
-            status = "open"
+    return entries
+
+
+def now_iso():
+    """Same shape as the hook's `date -Iseconds`."""
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def die(msg):
+    print(f"claude-sessions: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def entry_path(sid):
+    return os.path.join(REG, sid + ".json")
+
+
+def load_entry(sid):
+    try:
+        with open(entry_path(sid)) as fh:
+            return json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def save_entry(sid, entry):
+    """Atomic in-place write, mirroring the hook's mktemp/mv."""
+    fd, tmp = tempfile.mkstemp(dir=REG, prefix=".tmp.")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(entry, fh, indent=2, ensure_ascii=False)
+            fh.write("\n")
+        os.replace(tmp, entry_path(sid))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def clean_desc(text):
+    return " ".join(text.split())[:DESC_MAX]
+
+
+def resolve_sid(explicit):
+    sid = explicit or os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+    if not sid:
+        die("no session id given and $CLAUDE_CODE_SESSION_ID is not set")
+    return sid
+
+
+def format_row(entry):
+    """One-line feedback for a mutation, in the listing's column order."""
+    e = decorate(dict(entry))
+    return f"{status_of(e):<10} {e['when']}  {e['cmd']}  {e['desc']}"
+
+
+def cmd_forget(sid):
+    path = os.path.join(REG, sid + ".json")
+    os.remove(path)
+    print(f"removed {path}")
+
+
+def cmd_done(sid, desc, note):
+    entry = load_entry(sid)
+    if entry is None:
+        die(f"no registry entry for session {sid}")
+    if desc is not None:
+        entry["description"] = clean_desc(desc)
+    elif not (entry.get("description") or "").strip():
+        die("--desc is required: this session has no description yet")
+    if note is not None:
+        note = note.strip()
+        if note:
+            entry["done_note"] = note
         else:
-            # registered but no live claude process: killed, reboot, or unknown pid
-            status = "resumable"
-        if status == "ended" and not show_all:
+            entry.pop("done_note", None)
+    entry["done"] = now_iso()
+    save_entry(sid, entry)
+    print(format_row(entry))
+
+
+def cmd_undone(sid):
+    entry = load_entry(sid)
+    if entry is None:
+        die(f"no registry entry for session {sid}")
+    entry.pop("done", None)
+    entry.pop("done_note", None)
+    save_entry(sid, entry)
+    print(format_row(entry))
+
+
+def cmd_list(show_all, md):
+    rows, hidden = [], {}
+    for e in read_entries():
+        e["status"] = status_of(e)
+        if e["status"] in HIDDEN_BY_DEFAULT and not show_all:
+            hidden[e["status"]] = hidden.get(e["status"], 0) + 1
             continue
-        e["status"] = status
         rows.append(e)
 
     rows.sort(key=lambda e: e.get("last_activity", ""), reverse=True)
@@ -62,28 +221,70 @@ def main():
         print("no sessions in registry" + ("" if show_all else " (try --all)"))
         return
 
-    home = os.path.expanduser("~")
     for e in rows:
-        path = (e.get("cwd") or "?").replace(home, "~")
-        e["cmd"] = f"cd {path} && claude --resume {e['session_id']}"
-        e["when"] = (e.get("last_activity") or "")[:16].replace("T", " ")
-        e["desc"] = (e.get("description") or "").strip() or "-"
+        decorate(e)
+
+    # the reason explains the hidden rows, so it earns its width only there
+    cols = [("STATUS", "status")]
+    if show_all or md:
+        cols.append(("REASON", "reason"))
+    cols += [("LAST ACTIVITY", "when"), ("RESUME COMMAND", "cmd"), ("DESCRIPTION", "desc")]
 
     if md:
-        print("| Status | Last activity | Resume command | Description |")
-        print("|---|---|---|---|")
+        print("| " + " | ".join(h.capitalize() for h, _ in cols) + " |")
+        print("|" + "---|" * len(cols))
         for e in rows:
-            desc = e["desc"].replace("|", "\\|")
-            print(f"| {e['status']} | {e['when']} | `{e['cmd']}` | {desc} |")
+            cells = []
+            for _, k in cols:
+                v = e[k].replace("|", "\\|")
+                cells.append(f"`{v}`" if k == "cmd" else v)
+            print("| " + " | ".join(cells) + " |")
+        return
+
+    widths = [max(len(h), max(len(e[k]) for e in rows)) for h, k in cols]
+    widths[-1] = 0  # description: no padding, truncated instead
+    print("  ".join(h.ljust(w) for (h, _), w in zip(cols, widths)).rstrip())
+    for e in rows:
+        cells = [(e[k][:120] if k == "desc" else e[k]).ljust(w)
+                 for (_, k), w in zip(cols, widths)]
+        print("  ".join(cells).rstrip())
+
+    note = ""
+    if hidden:
+        parts = [f"{hidden[s]} {s}" for s in HIDDEN_BY_DEFAULT if s in hidden]
+        note = f"  (hidden: {', '.join(parts)} — use --all)"
+    print(f"\n{len(rows)} session(s){note}")
+
+
+def main():
+    p = argparse.ArgumentParser(
+        prog="claude-sessions",
+        description="List and mark Claude Code sessions from the hook-maintained registry.",
+    )
+    p.add_argument("--all", action="store_true",
+                   help="also show sessions hidden by default")
+    p.add_argument("--md", action="store_true", help="markdown output")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--forget", metavar="ID", help="remove one registry entry")
+    g.add_argument("--done", nargs="?", const="", metavar="ID",
+                   help="mark a session finished (ID defaults to $CLAUDE_CODE_SESSION_ID)")
+    g.add_argument("--undone", nargs="?", const="", metavar="ID",
+                   help="clear a session's done mark")
+    p.add_argument("--desc", help="new description, with --done")
+    p.add_argument("--note", help="outcome note, with --done (empty string clears it)")
+    args = p.parse_args()
+
+    if (args.desc is not None or args.note is not None) and args.done is None:
+        die("--desc/--note are only valid with --done")
+
+    if args.forget:
+        cmd_forget(args.forget)
+    elif args.done is not None:
+        cmd_done(resolve_sid(args.done), args.desc, args.note)
+    elif args.undone is not None:
+        cmd_undone(resolve_sid(args.undone))
     else:
-        wcmd = max(len(e["cmd"]) for e in rows)
-        print(f"{'STATUS':<10} {'LAST ACTIVITY':<16}  {'RESUME COMMAND':<{wcmd}}  DESCRIPTION")
-        for e in rows:
-            print(
-                f"{e['status']:<10} {e['when']}  {e['cmd']:<{wcmd}}  "
-                f"{e['desc'][:120]}"
-            )
-        print(f"\n{len(rows)} session(s)")
+        cmd_list(args.all, args.md)
 
 
 if __name__ == "__main__":
