@@ -71,7 +71,7 @@
           {{- end }}
         ]
       }
-    {{- if eq .env "gip" }},
+    {{- if eq .env "gip" }}
     ],
     "SessionStart": [
       {
@@ -94,8 +94,6 @@
           }
         ]
       }
-    ]
-    {{- else }}
     ]
     {{- end }}
   },
