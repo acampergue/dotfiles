@@ -25,6 +25,17 @@ profile desknohdmi {
     exec ~/.config/kanshi/scripts/apply-desknohdmi.sh
 }
 
+profile desk27top {
+    # Same desk, but the 24'' (GW2480) is gone: the 27'' that used to be
+    # $left now sits on top of $center (landscape), laptop takes the left slot.
+    output $laptop enable mode 1920x1080@59.999Hz position 0,1440
+    output $center enable mode 2560x1440@59.951Hz position 1920,1440
+    output $right  enable mode 2560x1440@59.951Hz position 4480,1440 transform 270
+    output $left   enable mode 2560x1440@59.951Hz position 1920,0
+
+    exec ~/.config/kanshi/scripts/apply-desk27top.sh
+}
+
 profile nomad {
     output $laptop enable mode 1920x1080@59.999Hz position 0,0
 }

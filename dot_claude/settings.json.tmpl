@@ -1,4 +1,5 @@
 {
+  "cleanupPeriodDays": 90,
   "permissions": {
     "allow": [
       "Bash(glab:*)",
@@ -60,18 +61,20 @@
             "type": "command",
             "command": "/home/acampergue/.claude/hooks/session-time.sh",
             "timeout": 10
-          }
           {{- if eq .env "gip" }},
+	  },
           {
             "type": "command",
             "command": "bash /home/acampergue/.claude/hooks/session-registry.sh prompt",
             "timeout": 10
           }
+          {{- else }}
+          }
           {{- end }}
         ]
       }
-    ]
     {{- if eq .env "gip" }},
+    ],
     "SessionStart": [
       {
         "hooks": [
@@ -93,6 +96,8 @@
           }
         ]
       }
+    ]
+    {{- else }}
     ]
     {{- end }}
   },
@@ -116,6 +121,12 @@
     "enabled": true,
     "failIfUnavailable": true,
     "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "*.gipmbh.de",
+        "gipmbh.de"
+      ]
+    },
     "filesystem": {
       "allowWrite": [
         "/home/acampergue/workspace",
@@ -129,6 +140,7 @@
     "enabled": true,
     "mode": "hold"
   },
+  "autoCompactEnabled": false,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
     "allow": [

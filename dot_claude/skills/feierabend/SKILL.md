@@ -1,6 +1,7 @@
 ---
 name: feierabend
 description: Tagesabschluss — reconstruct today's work from evidence (git, JIRA, session memory), reconcile against Tempo bookings, propose missing worklogs, do housekeeping, and write a handoff note for tomorrow. Use at the end of the workday.
+model: opus[1m]
 ---
 
 # Feierabend — Day Close

@@ -3,23 +3,43 @@
 
 Registry: ~/.claude/sessions-registry/ (written by ~/.claude/hooks/session-registry.sh)
 
+DESCRIPTION is the registry's own text: the session's first prompt, or whatever
+--done --desc last set. WHAT is what the session turned out to be — an LLM
+summary from --summarize, else the aiTitle Claude Code wrote into the transcript
+— followed by facts scraped from the transcript (merge requests, files edited).
+The two columns split the terminal's leftover width between them.
+
 Usage:
   claude-sessions               open + resumable sessions (table)
+  claude-sessions --lines N     cap how tall a row may grow (default 3; 1 for the
+                                old single-line rows, 0 for no limit)
+  claude-sessions N             resume session #N from that table (cd + claude --resume)
   claude-sessions --all         also show done and gone sessions, with the reason
+                                (they carry no number: resume those by copy/paste)
   claude-sessions --md          markdown output (e.g. claude-sessions --md > snapshot.md)
   claude-sessions --forget ID   remove one registry entry
   claude-sessions --done [ID] --desc TEXT [--note TEXT]
                                 mark a session finished (ID defaults to
                                 $CLAUDE_CODE_SESSION_ID; --note "" clears the note)
   claude-sessions --undone [ID] clear the done mark
+  claude-sessions --summarize [N|ID]
+                                have Claude read the transcript and write a one-line
+                                summary of what the session did into the registry
+  claude-sessions --summarize --all [--yes]
+                                backfill every session that has no current summary
 """
 import argparse
 import functools
 import glob
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
+import textwrap
+from concurrent import futures
 from datetime import datetime
 
 BASE = os.path.expanduser(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"))
@@ -38,6 +58,267 @@ CLEAN_EXIT_REASONS = ("prompt_input_exit", "clear", "logout", "exit", "resume")
 
 # the hook truncates descriptions to 200 chars; stay consistent
 DESC_MAX = 200
+
+# the two columns that absorb the terminal's leftover width
+FLEX_COLS = ("desc", "what")
+FLEX_MIN = 12
+# how tall one row may grow; 1 is the old single-line table, 0 means no limit
+DEFAULT_LINES = 3
+
+# keys decorate() adds for display only — they must never reach the registry file
+DISPLAY_KEYS = frozenset(
+    ("cmd", "id", "short", "when", "desc", "reason", "status", "num", "ticket", "what")
+)
+
+# --- transcript derivation ---------------------------------------------------
+
+TICKET_RE = re.compile(r"\b([A-Z][A-Z0-9]{1,9}-\d{2,6})\b")
+# prefixes that look like ticket keys but never are (SHA-256, CVE-2024-1234, ...)
+TICKET_DENY = frozenset(
+    """SHA MD CVE RFC UTF ISO AES RSA TLS SSL HTTP HTTPS UTC PEP JDK JEP JSR ANSI
+    IEEE DIN ECMA CSS HTML XML JSON YAML TOML SSH GPG PGP CRC BASE ASCII LTS EOL
+    EOF API URL URI UUID GPT AMD ARM IPV X EN DE FR ES IT PDF CI CD K8S""".split()
+)
+TASKDIR_RE = re.compile(r"/workspace/tasks/([A-Z][A-Z0-9]*-\d+)(?:/|$)")
+EDIT_TOOLS = frozenset(("Edit", "Write", "MultiEdit", "NotebookEdit"))
+# bump whenever scan_transcript changes shape, so cached blocks recompute
+CACHE_VERSION = 2
+
+SUMMARY_MODEL = "claude-sonnet-5"
+SUMMARY_INPUT_USD = 2.00  # per 1M input tokens, for the --all cost estimate
+SUMMARY_WORKERS = 4
+SUMMARY_MAX = 200
+CONDENSED_HEAD = 20000
+CONDENSED_TAIL = 40000
+TURN_MAX = 2000
+
+SUMMARY_PROMPT = """\
+The text after this instruction is a condensed Claude Code session transcript
+(user turns and Claude's replies; tool calls and their output stripped).
+
+Write ONE line describing what the session actually accomplished and where it was
+left. Rules:
+- English, plain text, no markdown, no leading dash, no trailing period.
+- At most 18 words. This is a table cell, not a paragraph — drop detail to fit.
+- Prefer concrete nouns: ticket keys, repo names, MR numbers, versions, filenames.
+- Say the outcome, not the opening question. If nothing was finished, say what
+  state it was left in.
+- Do not begin with "The session", "This session", "Claude" or "The user".
+Output that line and nothing else.\
+"""
+
+
+def wrap_cell(text, width, limit):
+    """Wrap to at most `limit` lines (0 = no limit), marking a cut with '…'."""
+    # break_on_hyphens would split P0909-32558 and alpaquita-lts-base mid-key
+    lines = textwrap.wrap(text, width, break_on_hyphens=False) or [""]
+    if limit and len(lines) > limit:
+        lines = lines[:limit]
+        last = lines[-1]
+        if len(last) >= width:
+            last = last[: width - 1]
+        lines[-1] = last.rstrip(" ,;:·-") + "…"
+    return lines
+
+
+def one_line(text, limit=SUMMARY_MAX):
+    """Collapse to a single line, cutting at a word boundary if it is too long."""
+    line = " ".join(text.split())
+    if len(line) <= limit:
+        return line
+    cut = line[:limit].rsplit(" ", 1)[0]
+    return (cut or line[:limit]).rstrip(" ,;:·-") + "…"
+
+
+@functools.lru_cache(maxsize=None)
+def transcript_path(sid):
+    hits = glob.glob(os.path.join(PROJ, "*", sid + ".jsonl"))
+    return hits[0] if hits else None
+
+
+def transcript_stamp(path):
+    """Cheap change detector: a transcript only ever grows."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return ""
+    return "%d:%d" % (st.st_size, int(st.st_mtime))
+
+
+def iter_records(path):
+    try:
+        fh = open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        for line in fh:
+            if not line.startswith("{"):
+                continue
+            try:
+                yield json.loads(line)
+            except ValueError:
+                continue
+
+
+def text_blocks(record):
+    """The human-readable text of a user or assistant record, tool traffic aside."""
+    content = (record.get("message") or {}).get("content")
+    if isinstance(content, str):
+        return [content]
+    if not isinstance(content, list):
+        return []
+    return [
+        b.get("text") or ""
+        for b in content
+        if isinstance(b, dict) and b.get("type") == "text"
+    ]
+
+
+def scan_transcript(path):
+    """Facts a session list can show without asking an LLM anything.
+
+    Ticket keys are kept in three tiers, because a key you *worked on* and a key
+    you merely *mentioned* look identical to a regex. A path under
+    ~/workspace/tasks/<TICKET>/ is proof of work, a key you typed is intent, and
+    a key that only ever appears in Claude's prose is usually just talk.
+    """
+    title, mrs, edits = "", [], set()
+    tiers = {"path": {}, "user": {}, "text": {}}
+
+    def add(tier, key):
+        tiers[tier][key] = tiers[tier].get(key, 0) + 1
+
+    def add_keys(tier, text):
+        for key in TICKET_RE.findall(text):
+            if key.split("-")[0] not in TICKET_DENY:
+                add(tier, key)
+
+    def add_path(text):
+        for key in TASKDIR_RE.findall(text):
+            add("path", key)
+
+    for r in iter_records(path):
+        kind = r.get("type")
+        if kind == "ai-title":
+            title = title or (r.get("aiTitle") or "").strip()
+        elif kind == "pr-link":
+            number = r.get("prNumber")
+            if number is not None and number not in mrs:
+                mrs.append(number)
+        elif kind == "user":
+            for text in text_blocks(r):
+                add_keys("user", text)
+        elif kind == "assistant":
+            for text in text_blocks(r):
+                add_keys("text", text)
+            for b in (r.get("message") or {}).get("content") or []:
+                if not isinstance(b, dict) or b.get("type") != "tool_use":
+                    continue
+                args = b.get("input") or {}
+                if b.get("name") in EDIT_TOOLS:
+                    path_arg = args.get("file_path")
+                    if path_arg:
+                        edits.add(path_arg)
+                        add_path(path_arg)
+                elif b.get("name") == "Bash":
+                    add_path(args.get("command") or "")
+    return title, tiers, mrs, len(edits)
+
+
+def rank_tickets(tiers, cwd):
+    """The best tier that has anything wins; inside it, most-mentioned first."""
+    keys = []
+    for tier in ("path", "user", "text"):
+        counts = tiers.get(tier) or {}
+        if counts:
+            keys = [k for k, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+            break
+    m = TASKDIR_RE.search(cwd or "")
+    if m:
+        if m.group(1) in keys:
+            keys.remove(m.group(1))
+        keys.insert(0, m.group(1))
+    return keys
+
+
+def derive(entry, write_cache=True):
+    """Transcript facts for one entry, cached in the entry until the file grows."""
+    sid = entry.get("session_id") or ""
+    path = transcript_path(sid)
+    if not path:
+        return {}
+    stamp = transcript_stamp(path)
+    cached = entry.get("derived") or {}
+    if cached.get("stamp") == stamp and cached.get("v") == CACHE_VERSION:
+        return cached
+    title, tiers, mrs, edits = scan_transcript(path)
+    keys = rank_tickets(tiers, entry.get("cwd"))
+    facts = {
+        "v": CACHE_VERSION,
+        "stamp": stamp,
+        "title": title,
+        "tickets": keys[:3],
+        "ticket_total": len(keys),
+        "mrs": mrs[-3:],
+        "edits": edits,
+    }
+    entry["derived"] = facts
+    if write_cache:
+        try:
+            save_entry(sid, entry)
+        except OSError:
+            pass  # a read-only registry costs speed, never correctness
+    return facts
+
+
+# --- display -----------------------------------------------------------------
+
+
+def manual_desc(entry):
+    """The description only when a human put it there, not the hook's first prompt."""
+    desc = (entry.get("description") or "").strip()
+    if not desc:
+        return ""
+    if entry.get("desc_source") == "manual":
+        return desc
+    # entries marked done before desc_source existed came from /done, which
+    # always passes --desc
+    if entry.get("done") and "desc_source" not in entry:
+        return desc
+    return ""
+
+
+def what_of(entry, facts):
+    """The WHAT cell: what the session did, as opposed to what it was asked.
+
+    DESCRIPTION keeps showing the registry's own text, so this never falls back
+    to it — two columns saying the same thing would waste the width.
+    """
+    for candidate in ((entry.get("summary") or "").strip(),
+                      (facts.get("title") or "").strip()):
+        if candidate:
+            return candidate
+    return ""
+
+
+def ticket_cell(facts):
+    keys = facts.get("tickets") or []
+    if not keys:
+        return "-"
+    extra = (facts.get("ticket_total") or len(keys)) - 1
+    return keys[0] + (" +%d" % extra if extra > 0 else "")
+
+
+def facts_suffix(facts):
+    bits = []
+    mrs = facts.get("mrs") or []
+    if mrs:
+        shown = " ".join("!%s" % n for n in mrs[:2])
+        bits.append(shown + (" +%d" % (len(mrs) - 2) if len(mrs) > 2 else ""))
+    edits = facts.get("edits") or 0
+    if edits:
+        bits.append("%d file%s" % (edits, "" if edits == 1 else "s"))
+    return " · ".join(bits)
 
 
 def claude_alive(pid):
@@ -97,15 +378,45 @@ def status_of(e):
     return "quit"
 
 
-def decorate(e):
+def decorate(e, facts=None):
     """Add the derived display fields to an entry."""
     home = os.path.expanduser("~")
     path = (e.get("cwd") or "?").replace(home, "~")
     e["cmd"] = f"cd {path} && claude --resume {e['session_id']}"
+    e["id"] = e.get("session_id") or "?"
+    e["short"] = e["id"][:8]
     e["when"] = (e.get("last_activity") or "")[:16].replace("T", " ")
-    e["desc"] = (e.get("description") or "").strip() or "-"
     e["reason"] = e.get("end_reason") or "-"
+    if facts is None:
+        facts = e.get("derived") or {}
+    e["desc"] = (e.get("description") or "").strip() or "-"
+    e["ticket"] = ticket_cell(facts)
+    suffix = facts_suffix(facts)
+    what = what_of(e, facts)
+    if what and suffix:
+        what += " · " + suffix
+    e["what"] = what or suffix or "-"
     return e
+
+
+def numbered_entries():
+    """Every entry, newest first, with `status` and `num` filled in.
+
+    Only rows the default listing shows get a number, so #N means the same
+    session with or without --all, and #1 is the most recent one.
+    """
+    entries = read_entries()
+    for e in entries:
+        e["status"] = status_of(e)
+    entries.sort(key=lambda e: e.get("last_activity", ""), reverse=True)
+    n = 0
+    for e in entries:
+        if e["status"] in HIDDEN_BY_DEFAULT:
+            e["num"] = None
+        else:
+            n += 1
+            e["num"] = n
+    return entries
 
 
 def read_entries():
@@ -143,10 +454,11 @@ def load_entry(sid):
 
 def save_entry(sid, entry):
     """Atomic in-place write, mirroring the hook's mktemp/mv."""
+    data = {k: v for k, v in entry.items() if k not in DISPLAY_KEYS}
     fd, tmp = tempfile.mkstemp(dir=REG, prefix=".tmp.")
     try:
         with os.fdopen(fd, "w") as fh:
-            json.dump(entry, fh, indent=2, ensure_ascii=False)
+            json.dump(data, fh, indent=2, ensure_ascii=False)
             fh.write("\n")
         os.replace(tmp, entry_path(sid))
     except BaseException:
@@ -168,7 +480,9 @@ def resolve_sid(explicit):
 
 def format_row(entry):
     """One-line feedback for a mutation, in the listing's column order."""
-    e = decorate(dict(entry))
+    e = dict(entry)
+    facts = derive(e, write_cache=False)
+    decorate(e, facts)
     return f"{status_of(e):<10} {e['when']}  {e['cmd']}  {e['desc']}"
 
 
@@ -184,8 +498,9 @@ def cmd_done(sid, desc, note):
         die(f"no registry entry for session {sid}")
     if desc is not None:
         entry["description"] = clean_desc(desc)
-    elif not (entry.get("description") or "").strip():
-        die("--desc is required: this session has no description yet")
+        entry["desc_source"] = "manual"
+    elif not manual_desc(entry):
+        die("--desc is required: this session has no hand-written description yet")
     if note is not None:
         note = note.strip()
         if note:
@@ -207,28 +522,201 @@ def cmd_undone(sid):
     print(format_row(entry))
 
 
-def cmd_list(show_all, md):
+def cmd_resume(num):
+    rows = [e for e in numbered_entries() if e["num"]]
+    if not rows:
+        die("no resumable sessions in registry")
+    if not 1 <= num <= len(rows):
+        die(f"no session #{num} (1..{len(rows)})")
+    e = decorate(rows[num - 1])
+    if e["status"] == "open":
+        die(f"session #{num} is still running (pid {e.get('pid')}) — switch to it instead")
+    cwd = e.get("cwd") or ""
+    if not os.path.isdir(cwd):
+        die(f"directory no longer exists: {e['cmd'].split(' && ')[0][3:]}")
+    print(f"resume #{num}  {e['cmd']}", flush=True)
+    os.chdir(cwd)
+    try:
+        # exec, not spawn: claude inherits this tty, signals and exit code
+        os.execvp("claude", ["claude", "--resume", e["session_id"]])
+    except OSError as exc:
+        die(f"could not launch claude: {exc}")
+
+
+# --- LLM summaries -----------------------------------------------------------
+
+
+def condensed_transcript(path):
+    """User turns and Claude's replies only — the tool traffic is 90% of the bytes."""
+    parts = []
+    for r in iter_records(path):
+        kind = r.get("type")
+        if kind not in ("user", "assistant"):
+            continue
+        text = " ".join(" ".join(t.split()) for t in text_blocks(r) if t.strip())
+        if not text:
+            continue
+        parts.append(("USER: " if kind == "user" else "CLAUDE: ") + text[:TURN_MAX])
+    body = "\n".join(parts)
+    if len(body) <= CONDENSED_HEAD + CONDENSED_TAIL:
+        return body
+    return (
+        body[:CONDENSED_HEAD]
+        + "\n[… middle of the transcript omitted …]\n"
+        + body[-CONDENSED_TAIL:]
+    )
+
+
+def ask_claude(text, sink=None):
+    """One line back from `claude -p`, or an error string starting with '!'.
+
+    The subprocess fires the SessionStart/UserPromptSubmit hooks like any other
+    claude run, so it would register itself as a session. `sink` redirects the
+    hook's registry at a throwaway directory instead of ours.
+    """
+    env = dict(os.environ)
+    if sink:
+        env["CLAUDE_SESSION_REGISTRY_DIR"] = sink
+    try:
+        proc = subprocess.run(
+            ["claude", "-p", "--model", SUMMARY_MODEL, SUMMARY_PROMPT],
+            input=text,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=env,
+        )
+    except FileNotFoundError:
+        return "!claude not found on PATH"
+    except subprocess.TimeoutExpired:
+        return "!claude timed out"
+    if proc.returncode != 0:
+        return "!claude exited %d: %s" % (
+            proc.returncode,
+            " ".join(proc.stderr.split())[:120],
+        )
+    line = one_line(proc.stdout)
+    return line or "!claude returned nothing"
+
+
+def summarize_entry(entry, sink=None):
+    """Write a fresh summary into one entry. Returns (sid, line, ok)."""
+    sid = entry["session_id"]
+    path = transcript_path(sid)
+    if not path:
+        return sid, "skipped: no transcript", False
+    body = condensed_transcript(path)
+    if not body.strip():
+        return sid, "skipped: transcript has no conversation", False
+    line = ask_claude(body, sink)
+    if line.startswith("!"):
+        return sid, "failed: " + line[1:], False
+    entry["summary"] = line
+    entry["summary_stamp"] = transcript_stamp(path)
+    try:
+        save_entry(sid, entry)
+    except OSError as exc:
+        return sid, f"failed to write registry: {exc}", False
+    return sid, line, True
+
+
+def needs_summary(entry):
+    path = transcript_path(entry.get("session_id") or "")
+    if not path:
+        return False
+    return entry.get("summary_stamp") != transcript_stamp(path)
+
+
+def cost_estimate(entries):
+    """Rough input-token spend of summarizing these sessions, in dollars."""
+    chars = 0
+    for e in entries:
+        path = transcript_path(e.get("session_id") or "")
+        try:
+            size = os.path.getsize(path) if path else 0
+        except OSError:
+            size = 0
+        # tool traffic is most of a transcript; the condensed text is capped
+        chars += min(CONDENSED_HEAD + CONDENSED_TAIL, size // 6)
+    tokens = chars / 4
+    return tokens, tokens / 1e6 * SUMMARY_INPUT_USD
+
+
+def cmd_summarize(target, do_all, assume_yes):
+    entries = numbered_entries()
+    if do_all:
+        todo = [e for e in entries if needs_summary(e)]
+        if not todo:
+            print("every session already has a current summary")
+            return
+        tokens, usd = cost_estimate(todo)
+        print(f"{len(todo)} session(s) to summarize with {SUMMARY_MODEL} "
+              f"(~{tokens/1000:.0f}k input tokens, roughly ${usd:.2f}).")
+        if not assume_yes:
+            sys.stdout.flush()  # the count must reach the user before die() does
+            if not sys.stdin.isatty():
+                die("refusing to summarize non-interactively without --yes")
+            if input("continue? [y/N] ").strip().lower() not in ("y", "yes"):
+                print("aborted")
+                return
+    else:
+        sid = target
+        if target.isdigit():
+            rows = [e for e in entries if e["num"]]
+            n = int(target)
+            if not 1 <= n <= len(rows):
+                die(f"no session #{n} (1..{len(rows)})")
+            sid = rows[n - 1]["session_id"]
+        elif not target:
+            sid = resolve_sid("")
+        match = [e for e in entries if e.get("session_id") == sid]
+        if not match:
+            die(f"no registry entry for session {sid}")
+        todo = match
+
+    done = 0
+    workers = min(SUMMARY_WORKERS, len(todo))
+    sink = tempfile.mkdtemp(prefix="claude-sessions-sink.")
+    try:
+        with futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            jobs = [pool.submit(summarize_entry, e, sink) for e in todo]
+            for job in jobs:
+                sid, line, ok = job.result()
+                done += ok
+                print(f"  {sid[:8]}  {line}")
+    finally:
+        shutil.rmtree(sink, ignore_errors=True)
+    print(f"\n{done}/{len(todo)} summarized")
+
+
+# --- listing -----------------------------------------------------------------
+
+
+def cmd_list(show_all, md, line_cap=DEFAULT_LINES):
     rows, hidden = [], {}
-    for e in read_entries():
-        e["status"] = status_of(e)
+    for e in numbered_entries():
         if e["status"] in HIDDEN_BY_DEFAULT and not show_all:
             hidden[e["status"]] = hidden.get(e["status"], 0) + 1
             continue
         rows.append(e)
 
-    rows.sort(key=lambda e: e.get("last_activity", ""), reverse=True)
     if not rows:
         print("no sessions in registry" + ("" if show_all else " (try --all)"))
         return
 
     for e in rows:
-        decorate(e)
+        decorate(e, derive(e))
+        e["num"] = str(e["num"]) if e["num"] else "-"
 
     # the reason explains the hidden rows, so it earns its width only there
-    cols = [("STATUS", "status")]
+    cols = [("#", "num"), ("STATUS", "status")]
     if show_all or md:
         cols.append(("REASON", "reason"))
-    cols += [("LAST ACTIVITY", "when"), ("RESUME COMMAND", "cmd"), ("DESCRIPTION", "desc")]
+    cols.append(("LAST ACTIVITY", "when"))
+    # a snapshot is pasted elsewhere, so it keeps the runnable command
+    cols.append(("RESUME COMMAND", "cmd") if md else ("ID", "short"))
+    cols.append(("DESCRIPTION", "desc"))
+    cols.append(("WHAT", "what"))
 
     if md:
         print("| " + " | ".join(h.capitalize() for h, _ in cols) + " |")
@@ -241,13 +729,33 @@ def cmd_list(show_all, md):
             print("| " + " | ".join(cells) + " |")
         return
 
+    def pad(text, key, width):
+        return text.rjust(width) if key == "num" else text.ljust(width)
+
     widths = [max(len(h), max(len(e[k]) for e in rows)) for h, k in cols]
-    widths[-1] = 0  # description: no padding, truncated instead
-    print("  ".join(h.ljust(w) for (h, _), w in zip(cols, widths)).rstrip())
+    # DESCRIPTION and WHAT share whatever the terminal has left over; a column
+    # that needs less than its half hands the slack to the other one
+    term = shutil.get_terminal_size(fallback=(200, 24)).columns
+    flex = [i for i, (_, k) in enumerate(cols) if k in FLEX_COLS]
+    fixed = sum(w for i, w in enumerate(widths) if i not in flex)
+    avail = max(term - fixed - 2 * (len(cols) - 1), FLEX_MIN * len(flex))
+    if sum(widths[i] for i in flex) > avail:
+        share = avail // len(flex)
+        thin = [i for i in flex if widths[i] <= share]
+        wide = [i for i in flex if i not in thin]
+        left = avail - sum(widths[i] for i in thin)
+        for i in wide:
+            widths[i] = max(left // len(wide), FLEX_MIN)
+    # each row is a block of 1..line_cap lines; the fixed columns appear only on
+    # its first line, so the eye reads down the left edge to find row starts
+    print("  ".join(pad(h, k, w) for (h, k), w in zip(cols, widths)).rstrip())
     for e in rows:
-        cells = [(e[k][:120] if k == "desc" else e[k]).ljust(w)
+        cells = [wrap_cell(e[k], w, line_cap) if k in FLEX_COLS else [e[k]]
                  for (_, k), w in zip(cols, widths)]
-        print("  ".join(cells).rstrip())
+        for line in range(max(len(c) for c in cells)):
+            out = [pad(c[line] if line < len(c) else "", k, w)
+                   for c, (_, k), w in zip(cells, cols, widths)]
+            print("  ".join(out).rstrip())
 
     note = ""
     if hidden:
@@ -261,30 +769,52 @@ def main():
         prog="claude-sessions",
         description="List and mark Claude Code sessions from the hook-maintained registry.",
     )
+    p.add_argument("n", nargs="?", type=int, metavar="N",
+                   help="resume session #N from the listing (cd + claude --resume)")
     p.add_argument("--all", action="store_true",
-                   help="also show sessions hidden by default")
+                   help="also show sessions hidden by default; "
+                        "with --summarize, backfill every session")
     p.add_argument("--md", action="store_true", help="markdown output")
+    p.add_argument("--lines", type=int, default=DEFAULT_LINES, metavar="N",
+                   help=f"max lines per session in the table (default {DEFAULT_LINES}; "
+                        "1 for the old single-line rows, 0 for no limit)")
     g = p.add_mutually_exclusive_group()
     g.add_argument("--forget", metavar="ID", help="remove one registry entry")
     g.add_argument("--done", nargs="?", const="", metavar="ID",
                    help="mark a session finished (ID defaults to $CLAUDE_CODE_SESSION_ID)")
     g.add_argument("--undone", nargs="?", const="", metavar="ID",
                    help="clear a session's done mark")
+    g.add_argument("--summarize", nargs="?", const="", metavar="N|ID",
+                   help=f"ask {SUMMARY_MODEL} to summarize a session's transcript "
+                        "(defaults to $CLAUDE_CODE_SESSION_ID; use --all to backfill)")
     p.add_argument("--desc", help="new description, with --done")
     p.add_argument("--note", help="outcome note, with --done (empty string clears it)")
+    p.add_argument("--yes", action="store_true",
+                   help="skip the confirmation prompt of --summarize --all")
     args = p.parse_args()
 
     if (args.desc is not None or args.note is not None) and args.done is None:
         die("--desc/--note are only valid with --done")
+    if args.yes and args.summarize is None:
+        die("--yes is only valid with --summarize")
+    if args.lines < 0:
+        die("--lines must be 0 or more")
+    if args.n is not None and not (args.forget is None and args.done is None
+                                   and args.undone is None and args.summarize is None):
+        die("N cannot be combined with --forget/--done/--undone/--summarize")
 
-    if args.forget:
+    if args.n is not None:
+        cmd_resume(args.n)
+    elif args.forget:
         cmd_forget(args.forget)
     elif args.done is not None:
         cmd_done(resolve_sid(args.done), args.desc, args.note)
     elif args.undone is not None:
         cmd_undone(resolve_sid(args.undone))
+    elif args.summarize is not None:
+        cmd_summarize(args.summarize, args.all, args.yes)
     else:
-        cmd_list(args.all, args.md)
+        cmd_list(args.all, args.md, args.lines)
 
 
 if __name__ == "__main__":

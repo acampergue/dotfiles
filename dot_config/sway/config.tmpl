@@ -59,12 +59,19 @@ set $menu fuzzel
          # resume 'swaymsg "output HDMI-A-1 disable ; output eDP-1 disable"' \
          # before-sleep 'swaylock -f -c 000000'
 
+# exec swayidle -w \
+         # timeout 900 'swaylock -f -c 000000' \
+         # timeout 1800 'swaymsg "output eDP-1 power off"' resume 'swaymsg "output eDP-1 power on"' \
+         # before-sleep 'swaylock -f -c 000000'
+
 exec swayidle -w \
-         timeout 900 'swaylock -f -c 000000' \
 {{- if eq .env "gip" }}
-         timeout 1800 'swaymsg "output eDP-1 power off"' resume 'swaymsg "output eDP-1 power on"' \
+         timeout 600 'swaylock -f -c 000000' \
+         timeout 720 'swaymsg "output * power off"' \
+         resume 'swaymsg "output * power on"' \
 {{- end }}
 {{- if eq .env "home" }}
+         timeout 900 'swaylock -f -c 000000' \
          timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
 {{- end }}
          before-sleep 'swaylock -f -c 000000'

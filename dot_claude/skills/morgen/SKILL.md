@@ -1,6 +1,7 @@
 ---
 name: morgen
 description: Tagesstart — collect standup data, review high-priority tickets, unfinished work from yesterday and waiting MRs, then propose a prioritized day plan. Use at the start of the workday.
+model: opus[1m]
 ---
 
 # Morgen — Day Kickoff
