@@ -52,23 +52,21 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5-1[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
+          {{- if eq .env "gip" }},
           {
             "type": "command",
             "command": "/home/acampergue/.claude/hooks/session-time.sh",
             "timeout": 10
-          {{- if eq .env "gip" }},
           },
           {
             "type": "command",
             "command": "bash /home/acampergue/.claude/hooks/session-registry.sh prompt",
             "timeout": 10
-          }
-          {{- else }}
           }
           {{- end }}
         ]
