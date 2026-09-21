@@ -57,7 +57,7 @@
     "UserPromptSubmit": [
       {
         "hooks": [
-          {{- if eq .env "gip" }},
+          {{- if eq .env "gip" }}
           {
             "type": "command",
             "command": "/home/acampergue/.claude/hooks/session-time.sh",
